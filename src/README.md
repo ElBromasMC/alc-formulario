@@ -4,6 +4,7 @@
 - POSTGRESQL_URL: PostgreSQL database url
 - SESSION_KEY: Key to encrypt session cookies
 - REL: Indicates the release number
+- APP_ADMIN_PASSWORD: Webpage admin password
 
 Example:
 
@@ -13,4 +14,951 @@ POSTGRESQL_URL="postgres://postgres:LlaveSecreta01@db:5432/jrdelperu?sslmode=dis
 SESSION_KEY="LlaveSecreta02"
 REL="1"
 ```
+
+# AI
+
+Hi, I am working with Go programming language, with templ, pgx v5 libraries,
+Echo framework and sqlc utility. I am building a web application for a rollout
+project.
+
+This is my database schema:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+/* --- App users --- */
+
+CREATE TYPE user_role AS ENUM ('ADMIN', 'TECNICO');
+
+CREATE TABLE IF NOT EXISTS app_users (
+    user_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name varchar(255) NOT NULL,
+    email varchar(255) UNIQUE NOT NULL,
+    hashed_password text NOT NULL,
+    role user_role NOT NULL DEFAULT 'TECNICO',
+    dni varchar(25) NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT NOW(),
+    updated_at timestamptz NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS app_sessions (
+    session_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id uuid NOT NULL REFERENCES app_users ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT NOW(),
+    expires_at timestamptz NOT NULL DEFAULT NOW() + INTERVAL '1 month'
+);
+
+/* --- Machine users --- */
+
+CREATE TABLE IF NOT EXISTS machine_users (
+    dni varchar(25) PRIMARY KEY,
+    personal_code text UNIQUE NOT NULL,
+    name text NOT NULL,
+    email varchar(255) UNIQUE NOT NULL,
+    society text NOT NULL,
+    site text NOT NULL,
+    area text NOT NULL,
+    floor_name text NOT NULL
+);
+
+/* --- Machines and devices --- */
+
+CREATE TYPE machine_type AS ENUM ('PC', 'LAPTOP');
+CREATE TYPE machine_profile AS ENUM ('ESPECIAL1', 'ESPECIAL2', 'PROCESAMIENTO', 'REGULAR');
+
+CREATE TABLE IF NOT EXISTS machines (
+    serial_num text PRIMARY KEY,
+    type machine_type NOT NULL,
+    mtm text NOT NULL,
+    model text NOT NULL,
+    plate_num text NOT NULL,
+    disk_size text NOT NULL,
+    memory_size text NOT NULL,
+    processor text NOT NULL,
+    profile machine_profile NOT NULL
+);
+
+CREATE TYPE device_type AS ENUM ('NEW', 'OLD');
+CREATE TYPE device_status AS ENUM ('ASIGNACION', 'RECUPERACION', 'PRESTAMO', 'BACKUP');
+
+CREATE TABLE IF NOT EXISTS devices (
+    device_code text PRIMARY KEY,
+    machine_serial_num text UNIQUE NOT NULL REFERENCES machines ON DELETE RESTRICT,
+    type device_type NOT NULL,
+    hostname text NOT NULL,
+    status device_status NOT NULL,
+    additional_software text NOT NULL
+);
+
+/* --- Software --- */
+
+CREATE TABLE IF NOT EXISTS software (
+    software_id int PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    name text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS device_software (
+    device_code text NOT NULL REFERENCES devices ON DELETE CASCADE,
+    software_id int NOT NULL REFERENCES software ON DELETE CASCADE,
+    PRIMARY KEY (device_code, software_id)
+);
+
+/* --- Configuration items --- */
+
+CREATE TABLE IF NOT EXISTS configuration_items (
+    item_id int PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    name text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS device_configuration (
+    device_code text NOT NULL REFERENCES devices ON DELETE CASCADE,
+    item_id int NOT NULL REFERENCES configuration_items ON DELETE CASCADE,
+    PRIMARY KEY (device_code, item_id)
+);
+
+
+/* --- Peripherals --- */
+
+CREATE TABLE IF NOT EXISTS peripherals (
+    peripheral_id int PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    name text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS device_peripherals (
+    device_code text NOT NULL REFERENCES devices ON DELETE CASCADE,
+    peripheral_id int NOT NULL REFERENCES peripherals ON DELETE CASCADE,
+    plate_num text NOT NULL,
+    serial_num text NOT NULL,
+    PRIMARY KEY (device_code, peripheral_id)
+);
+
+/* --- Certificate --- */
+
+CREATE TYPE certificate_status AS ENUM ('PENDING', 'CONFIRMED');
+
+CREATE TABLE IF NOT EXISTS alicorp_2025_certificates (
+    certificate_id int PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    ticket_name text UNIQUE NOT NULL,
+
+    app_user_id uuid NOT NULL REFERENCES app_users ON DELETE RESTRICT,
+    machine_user_dni varchar(25) NOT NULL REFERENCES machine_users ON DELETE RESTRICT,
+
+    new_device_code text NOT NULL REFERENCES devices ON DELETE RESTRICT,
+    old_device_code text NOT NULL REFERENCES devices ON DELETE RESTRICT,
+
+    disk_c_size text NOT NULL,
+    disk_d_size text NOT NULL,
+
+    printer_name text NOT NULL,
+    printer_ip text NOT NULL,
+    printer_test boolean NOT NULL,
+
+    comments text NOT NULL,
+
+    confirmation_status certificate_status NOT NULL DEFAULT 'PENDING',
+    confirmation_token uuid UNIQUE DEFAULT uuid_generate_v4(),
+    confirmed_at timestamptz,
+
+    created_at timestamptz NOT NULL DEFAULT NOW(),
+    updated_at timestamptz NOT NULL DEFAULT NOW()
+);
+```
+
+And, here is the glue code autogenerated by sqlc:
+
+```go
+// Code generated by sqlc. DO NOT EDIT.
+// versions:
+//   sqlc v1.29.0
+
+package repository
+
+import (
+	"database/sql/driver"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type CertificateStatus string
+
+const (
+	CertificateStatusPENDING   CertificateStatus = "PENDING"
+	CertificateStatusCONFIRMED CertificateStatus = "CONFIRMED"
+)
+
+func (e *CertificateStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CertificateStatus(s)
+	case string:
+		*e = CertificateStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CertificateStatus: %T", src)
+	}
+	return nil
+}
+
+type NullCertificateStatus struct {
+	CertificateStatus CertificateStatus
+	Valid             bool // Valid is true if CertificateStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCertificateStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.CertificateStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CertificateStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCertificateStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CertificateStatus), nil
+}
+
+type DeviceStatus string
+
+const (
+	DeviceStatusASIGNACION   DeviceStatus = "ASIGNACION"
+	DeviceStatusRECUPERACION DeviceStatus = "RECUPERACION"
+	DeviceStatusPRESTAMO     DeviceStatus = "PRESTAMO"
+	DeviceStatusBACKUP       DeviceStatus = "BACKUP"
+)
+
+func (e *DeviceStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeviceStatus(s)
+	case string:
+		*e = DeviceStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeviceStatus: %T", src)
+	}
+	return nil
+}
+
+type NullDeviceStatus struct {
+	DeviceStatus DeviceStatus
+	Valid        bool // Valid is true if DeviceStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeviceStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeviceStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeviceStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeviceStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeviceStatus), nil
+}
+
+type DeviceType string
+
+const (
+	DeviceTypeNEW DeviceType = "NEW"
+	DeviceTypeOLD DeviceType = "OLD"
+)
+
+func (e *DeviceType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DeviceType(s)
+	case string:
+		*e = DeviceType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DeviceType: %T", src)
+	}
+	return nil
+}
+
+type NullDeviceType struct {
+	DeviceType DeviceType
+	Valid      bool // Valid is true if DeviceType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDeviceType) Scan(value interface{}) error {
+	if value == nil {
+		ns.DeviceType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DeviceType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDeviceType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DeviceType), nil
+}
+
+type MachineProfile string
+
+const (
+	MachineProfileESPECIAL1     MachineProfile = "ESPECIAL1"
+	MachineProfileESPECIAL2     MachineProfile = "ESPECIAL2"
+	MachineProfilePROCESAMIENTO MachineProfile = "PROCESAMIENTO"
+	MachineProfileREGULAR       MachineProfile = "REGULAR"
+)
+
+func (e *MachineProfile) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MachineProfile(s)
+	case string:
+		*e = MachineProfile(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MachineProfile: %T", src)
+	}
+	return nil
+}
+
+type NullMachineProfile struct {
+	MachineProfile MachineProfile
+	Valid          bool // Valid is true if MachineProfile is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMachineProfile) Scan(value interface{}) error {
+	if value == nil {
+		ns.MachineProfile, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MachineProfile.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMachineProfile) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MachineProfile), nil
+}
+
+type MachineType string
+
+const (
+	MachineTypePC     MachineType = "PC"
+	MachineTypeLAPTOP MachineType = "LAPTOP"
+)
+
+func (e *MachineType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MachineType(s)
+	case string:
+		*e = MachineType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MachineType: %T", src)
+	}
+	return nil
+}
+
+type NullMachineType struct {
+	MachineType MachineType
+	Valid       bool // Valid is true if MachineType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMachineType) Scan(value interface{}) error {
+	if value == nil {
+		ns.MachineType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MachineType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMachineType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MachineType), nil
+}
+
+type UserRole string
+
+const (
+	UserRoleADMIN   UserRole = "ADMIN"
+	UserRoleTECNICO UserRole = "TECNICO"
+)
+
+func (e *UserRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserRole(s)
+	case string:
+		*e = UserRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserRole: %T", src)
+	}
+	return nil
+}
+
+type NullUserRole struct {
+	UserRole UserRole
+	Valid    bool // Valid is true if UserRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserRole), nil
+}
+
+type Alicorp2025Certificate struct {
+	CertificateID      int32
+	TicketName         string
+	AppUserID          pgtype.UUID
+	MachineUserDni     string
+	NewDeviceCode      string
+	OldDeviceCode      string
+	DiskCSize          string
+	DiskDSize          string
+	PrinterName        string
+	PrinterIp          string
+	PrinterTest        bool
+	Comments           string
+	ConfirmationStatus CertificateStatus
+	ConfirmationToken  pgtype.UUID
+	ConfirmedAt        pgtype.Timestamptz
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+type AppSession struct {
+	SessionID pgtype.UUID
+	UserID    pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+	ExpiresAt pgtype.Timestamptz
+}
+
+type AppUser struct {
+	UserID         pgtype.UUID
+	Name           string
+	Email          string
+	HashedPassword string
+	Role           UserRole
+	Dni            string
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+type ConfigurationItem struct {
+	ItemID int32
+	Name   string
+}
+
+type Device struct {
+	DeviceCode         string
+	MachineSerialNum   string
+	Type               DeviceType
+	Hostname           string
+	Status             DeviceStatus
+	AdditionalSoftware string
+}
+
+type DeviceConfiguration struct {
+	DeviceCode string
+	ItemID     int32
+}
+
+type DevicePeripheral struct {
+	DeviceCode   string
+	PeripheralID int32
+	PlateNum     string
+	SerialNum    string
+}
+
+type DeviceSoftware struct {
+	DeviceCode string
+	SoftwareID int32
+}
+
+type Machine struct {
+	SerialNum  string
+	Type       MachineType
+	Mtm        string
+	Model      string
+	PlateNum   string
+	DiskSize   string
+	MemorySize string
+	Processor  string
+	Profile    MachineProfile
+}
+
+type MachineUser struct {
+	Dni          string
+	PersonalCode string
+	Name         string
+	Email        string
+	Society      string
+	Site         string
+	Area         string
+	FloorName    string
+}
+
+type Peripheral struct {
+	PeripheralID int32
+	Name         string
+}
+
+type Software struct {
+	SoftwareID int32
+	Name       string
+}
+```
+
+Here is my project structure, too. My module path is "alc".
+
+.
+├── Dockerfile
+├── Makefile
+├── README.md
+├── assets
+│   ├── embed.go
+│   ├── embed_dev.go
+│   └── static
+│       ├── css
+│       ├── img
+│       └── js
+│           └── live-reload.js
+├── cmd
+│   └── server
+│       ├── init.go
+│       ├── init_dev.go
+│       └── main.go
+├── config
+│   └── path.go
+├── db
+│   ├── migrations
+│   │   ├── 000001_initialize_schema.down.sql
+│   │   └── 000001_initialize_schema.up.sql
+│   └── query
+│       └── user.sql
+├── go.mod
+├── go.sum
+├── handler
+│   ├── handler.go
+│   ├── page.go
+│   └── util.go
+├── model
+│   └── user.go
+├── package-lock.json
+├── package.json
+├── scripts
+│   ├── entrypoint-dev.sh
+│   ├── live-reload.cjs
+│   └── tailwind.sh
+├── service
+│   └── user.go
+├── sqlc.yml
+├── tailwind.config.cjs
+├── tailwind.css
+└── view
+    ├── js
+    │   ├── component
+    │   │   └── Carousel.js
+    │   └── main.js
+    ├── layout.templ
+    └── page.templ
+
+Please analyze it carefully. In the next prompt, I will give you more
+instructions.
+
+
+Here is a quick view of the sqlc documentation. Please, search in the web to
+find more about the usage of this tool.
+
+# Getting started with PostgreSQL
+
+This tutorial assumes that the latest version of sqlc is
+[installed](../overview/install.md) and ready to use.
+
+We'll generate Go code here, but other
+[language plugins](../reference/language-support.rst) are available. You'll
+naturally need the Go toolchain if you want to build and run a program with the
+code sqlc generates, but sqlc itself has no dependencies.
+
+At the end, you'll push your SQL queries to [sqlc
+Cloud](https://dashboard.sqlc.dev/) for further insights and analysis.
+
+## Setting up
+
+Create a new directory called `sqlc-tutorial` and open it up.
+
+Initialize a new Go module named `tutorial.sqlc.dev/app`:
+
+```shell
+go mod init tutorial.sqlc.dev/app
+```
+
+sqlc looks for either a `sqlc.(yaml|yml)` or `sqlc.json` file in the current
+directory. In our new directory, create a file named `sqlc.yaml` with the
+following contents:
+
+```yaml
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "query.sql"
+    schema: "schema.sql"
+    gen:
+      go:
+        package: "tutorial"
+        out: "tutorial"
+        sql_package: "pgx/v5"
+```
+
+## Schema and queries
+
+sqlc needs to know your database schema and queries in order to generate code.
+In the same directory, create a file named `schema.sql` with the following
+content:
+
+```sql
+CREATE TABLE authors (
+  id   BIGSERIAL PRIMARY KEY,
+  name text      NOT NULL,
+  bio  text
+);
+```
+
+Next, create a `query.sql` file with the following five queries:
+
+```sql
+-- name: GetAuthor :one
+SELECT * FROM authors
+WHERE id = $1 LIMIT 1;
+
+-- name: ListAuthors :many
+SELECT * FROM authors
+ORDER BY name;
+
+-- name: CreateAuthor :one
+INSERT INTO authors (
+  name, bio
+) VALUES (
+  $1, $2
+)
+RETURNING *;
+
+-- name: UpdateAuthor :exec
+UPDATE authors
+  set name = $2,
+  bio = $3
+WHERE id = $1;
+
+-- name: DeleteAuthor :exec
+DELETE FROM authors
+WHERE id = $1;
+```
+
+If you prefer, you can alter the `UpdateAuthor` query to return the updated
+record:
+
+```sql
+-- name: UpdateAuthor :one
+UPDATE authors
+  set name = $2,
+  bio = $3
+WHERE id = $1
+RETURNING *;
+```
+
+## Generating code
+
+You are now ready to generate code. You shouldn't see any output when you run
+the `generate` subcommand, unless something goes wrong:
+
+```shell
+sqlc generate
+```
+
+You should now have a `tutorial` subdirectory with three files containing Go
+source code. These files comprise a Go package named `tutorial`:
+
+```
+├── go.mod
+├── query.sql
+├── schema.sql
+├── sqlc.yaml
+└── tutorial
+    ├── db.go
+    ├── models.go
+    └── query.sql.go
+```
+
+## Using generated code
+
+You can use your newly-generated `tutorial` package from any Go program.
+Create a file named `tutorial.go` and add the following contents:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"reflect"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"tutorial.sqlc.dev/app/tutorial"
+)
+
+func run() error {
+	ctx := context.Background()
+
+	conn, err := pgx.Connect(ctx, "user=pqgotest dbname=pqgotest sslmode=verify-full")
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+
+	queries := tutorial.New(conn)
+
+	// list all authors
+	authors, err := queries.ListAuthors(ctx)
+	if err != nil {
+		return err
+	}
+	log.Println(authors)
+
+	// create an author
+	insertedAuthor, err := queries.CreateAuthor(ctx, tutorial.CreateAuthorParams{
+		Name: "Brian Kernighan",
+		Bio:  pgtype.Text{String: "Co-author of The C Programming Language and The Go Programming Language", Valid: true},
+	})
+	if err != nil {
+		return err
+	}
+	log.Println(insertedAuthor)
+
+	// get the author we just inserted
+	fetchedAuthor, err := queries.GetAuthor(ctx, insertedAuthor.ID)
+	if err != nil {
+		return err
+	}
+
+	// prints true
+	log.Println(reflect.DeepEqual(insertedAuthor, fetchedAuthor))
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+Before this code will compile you'll need to fetch the relevant PostgreSQL
+driver. You can use `lib/pq` with the standard library's `database/sql`
+package, but in this tutorial we've used `pgx/v5`:
+
+```shell
+go get github.com/jackc/pgx/v5
+go build ./...
+```
+
+The program should compile without errors. To make that possible, sqlc generates
+readable, **idiomatic** Go code that you otherwise would've had to write
+yourself. Take a look in `tutorial/query.sql.go`.
+
+Of course for this program to run successfully you'll need
+to compile after replacing the database connection parameters in the call to
+`pgx.Connect()` with the correct parameters for your database. And your
+database must have the `authors` table as defined in `schema.sql`.
+
+You should now have a working program using sqlc's generated Go source code,
+and hopefully can see how you'd use sqlc in your own real-world applications.
+
+## Query verification
+
+[sqlc Cloud](https://dashboard.sqlc.dev) provides additional verification, catching subtle bugs. To get started, create a
+[dashboard account](https://dashboard.sqlc.dev). Once you've signed in, create a
+project and generate an auth token. Add your project's ID to the `cloud` block
+to your sqlc.yaml.
+
+```yaml
+version: "2"
+cloud:
+  # Replace <PROJECT_ID> with your project ID from the sqlc Cloud dashboard
+  project: "<PROJECT_ID>"
+sql:
+  - engine: "postgresql"
+    queries: "query.sql"
+    schema: "schema.sql"
+    gen:
+      go:
+        package: "tutorial"
+        out: "tutorial"
+        sql_package: "pgx/v5"
+```
+
+Replace `<PROJECT_ID>` with your project ID from the sqlc Cloud dashboard. It
+will look something like `01HA8SZH31HKYE9RR3N3N3TSJM`.
+
+And finally, set the `SQLC_AUTH_TOKEN` environment variable:
+
+```shell
+export SQLC_AUTH_TOKEN="<your sqlc auth token>"
+```
+
+```shell
+$ sqlc push --tag tutorial
+```
+
+In the sidebar, go to the "Queries" section to see your published queries. Run
+`verify` to ensure that previously published queries continue to work against
+updated database schema.
+
+```shell
+$ sqlc verify --against tutorial
+```
+
+# Using transactions
+In the code generated by sqlc, the `WithTx` method allows a `Queries` instance to be associated with a transaction.
+
+For example, with the following SQL structure:
+
+`schema.sql`:
+```sql
+CREATE TABLE records (
+  id SERIAL PRIMARY KEY,
+  counter INT NOT NULL
+);
+```
+
+`query.sql`
+```sql
+-- name: GetRecord :one
+SELECT * FROM records
+WHERE id = $1;
+
+-- name: UpdateRecord :exec
+UPDATE records SET counter = $2
+WHERE id = $1;
+```
+
+And the generated code from sqlc in `db.go`:
+```go
+package tutorial
+
+import (
+	"context"
+	"database/sql"
+)
+
+type DBTX interface {
+	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+	PrepareContext(context.Context, string) (*sql.Stmt, error)
+	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+}
+
+func New(db DBTX) *Queries {
+	return &Queries{db: db}
+}
+
+type Queries struct {
+	db DBTX
+}
+
+func (q *Queries) WithTx(tx *sql.Tx) *Queries {
+	return &Queries{
+		db: tx,
+	}
+}
+
+```
+
+You'd use it like this:
+
+```go
+// Using `github/lib/pq` as the driver.
+func bumpCounter(ctx context.Context, db *sql.DB, queries *tutorial.Queries, id int32) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	qtx := queries.WithTx(tx)
+	r, err := qtx.GetRecord(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := qtx.UpdateRecord(ctx, tutorial.UpdateRecordParams{
+		ID:      r.ID,
+		Counter: r.Counter + 1,
+	}); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// Using `github.com/jackc/pgx/v5` as the driver.
+func bumpCounter(ctx context.Context, db *pgx.Conn, queries *tutorial.Queries, id int32) error {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	qtx := queries.WithTx(tx)
+	r, err := qtx.GetRecord(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := qtx.UpdateRecord(ctx, tutorial.UpdateRecordParams{
+		ID:      r.ID,
+		Counter: r.Counter + 1,
+	}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+```
+
+I want to use a minimalistic style. Now, I want to create the app user login
+management. I need the html, css, handlers, middleware, etc.
+
+
+
+Also, I want to implement the following:
+
+- When a user logs on they must be redirected to this form.
+- In the admin panel, I want a way to load Software, Peripherals, Configuration Items.
+- In the admin panel, I want a way to bulk load
 

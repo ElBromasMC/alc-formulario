@@ -1,0 +1,192 @@
+package view
+
+import (
+	"alc/repository"
+	"fmt"
+)
+
+// AdminPageProps holds all the data needed for the admin panel.
+type AdminPageProps struct {
+	Users       []repository.AppUser
+	Software    []repository.Software
+	Peripherals []repository.Peripheral
+	ConfigItems []repository.ConfigurationItem
+}
+
+// Reusable component for managing a simple item (Software, Peripheral, etc.)
+templ itemManagementSection(title string, formAction string, items any) {
+	<div class="bg-white p-6 rounded-lg shadow-md mb-8">
+		<h2 class="text-xl font-semibold mb-4 text-gray-700">{ title }</h2>
+		<!-- Create Item Form -->
+		<form method="POST" action={ templ.URL(formAction) } class="flex gap-4 mb-6 items-end">
+			<div class="flex-grow">
+				<label for={ title + "-name" } class="block text-sm font-medium text-gray-600">New Item Name</label>
+				<input type="text" name="name" id={ title + "-name" } required class="mt-1 p-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500"/>
+			</div>
+			<button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline">
+				Add
+			</button>
+		</form>
+		<!-- Items List -->
+		<div class="overflow-x-auto max-h-60">
+			<table class="min-w-full bg-white">
+				<thead class="bg-gray-100 sticky top-0">
+					<tr>
+						<th class="text-left py-2 px-4 font-medium text-gray-600">ID</th>
+						<th class="text-left py-2 px-4 font-medium text-gray-600">Name</th>
+					</tr>
+				</thead>
+				<tbody>
+					switch v := items.(type) {
+						case []repository.Software:
+							for _, item := range v {
+								<tr class="border-b border-gray-200 hover:bg-gray-50">
+									<td class="py-2 px-4">{ fmt.Sprint(item.SoftwareID) }</td>
+									<td class="py-2 px-4">{ item.Name }</td>
+								</tr>
+							}
+						case []repository.Peripheral:
+							for _, item := range v {
+								<tr class="border-b border-gray-200 hover:bg-gray-50">
+									<td class="py-2 px-4">{ fmt.Sprint(item.PeripheralID) }</td>
+									<td class="py-2 px-4">{ item.Name }</td>
+								</tr>
+							}
+						case []repository.ConfigurationItem:
+							for _, item := range v {
+								<tr class="border-b border-gray-200 hover:bg-gray-50">
+									<td class="py-2 px-4">{ fmt.Sprint(item.ItemID) }</td>
+									<td class="py-2 px-4">{ item.Name }</td>
+								</tr>
+							}
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+// Component for CSV upload forms
+templ bulkUploadSection(title string, formAction string, headers string) {
+	<div class="bg-white p-6 rounded-lg shadow-md mb-8">
+		<h2 class="text-xl font-semibold mb-4 text-gray-700">{ title }</h2>
+		<form method="POST" action={ templ.URL(formAction) } enctype="multipart/form-data">
+			<div class="mb-4">
+				<label for="csvfile" class="block text-sm font-medium text-gray-600">Upload CSV File</label>
+				<input type="file" name="csvfile" id="csvfile" required accept=".csv" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+			</div>
+			<div class="text-xs text-gray-500 mb-4">
+				<p class="font-medium">Required CSV Header:</p>
+				<p class="font-mono bg-gray-100 p-1 rounded">{ headers }</p>
+			</div>
+			<button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline">
+				Upload and Process
+			</button>
+		</form>
+	</div>
+}
+
+templ AdminPage(props AdminPageProps) {
+	@BasePage("Admin Panel") {
+		<div class="container mx-auto p-4 md:p-8">
+			<div class="flex justify-between items-center mb-6">
+				<h1 class="text-3xl font-bold text-gray-800">Admin Panel</h1>
+				<a href="/logout" class="text-sm text-blue-500 hover:underline">Logout</a>
+			</div>
+			<div class="bg-white p-6 rounded-lg shadow-md mb-8">
+				<h2 class="text-xl font-semibold mb-2 text-gray-700">Reportes</h2>
+				<p class="text-sm text-gray-600 mb-4">Descargue un reporte completo de todos los certificados en formato CSV.</p>
+				<a href="/admin/report/download" class="inline-block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline">
+					Descargar Reporte de Certificados
+				</a>
+			</div>
+			<h2 class="text-2xl font-bold text-gray-800 mt-8 mb-4">Bulk Data Upload</h2>
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+				@bulkUploadSection(
+					"Upload Machine Users",
+					"/admin/upload/machine-users",
+					"Sociedad,Cod. Personal,Número de documento,Nombre Completo,Predio,E-Mail Corporativo,Teléfono Personal,area,Piso",
+				)
+				@bulkUploadSection(
+					"Upload Machines",
+					"/admin/upload/machines",
+					"serial_number,tipo,mtm,modelo,placa,ssd,ram,procesador,perfil_alicorp",
+				)
+			</div>
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+				@itemManagementSection("Software Management", "/admin/software", props.Software)
+				@itemManagementSection("Peripheral Management", "/admin/peripherals", props.Peripherals)
+				@itemManagementSection("Configuration Item Management", "/admin/config-items", props.ConfigItems)
+			</div>
+			<div class="bg-white p-6 rounded-lg shadow-md mt-8">
+				<h2 class="text-xl font-semibold mb-4 text-gray-700">User Management</h2>
+				<form method="POST" action="/admin/users" class="mb-6">
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div>
+							<label for="name" class="block text-sm font-medium text-gray-600">Full Name</label>
+							<input type="text" name="name" id="name" required class="mt-1 p-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500"/>
+						</div>
+						<div>
+							<label for="email" class="block text-sm font-medium text-gray-600">Email</label>
+							<input type="email" name="email" id="email" required class="mt-1 p-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500"/>
+						</div>
+						<div>
+							<label for="password" class="block text-sm font-medium text-gray-600">Password</label>
+							<input type="password" name="password" id="password" required class="mt-1 p-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500"/>
+						</div>
+						<div>
+							<label for="dni" class="block text-sm font-medium text-gray-600">DNI</label>
+							<input type="text" name="dni" id="dni" required class="mt-1 p-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500"/>
+						</div>
+						<div>
+							<label for="role" class="block text-sm font-medium text-gray-600">Role</label>
+							<select name="role" id="role" class="mt-1 p-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500">
+								<option value="TECNICO">Tecnico</option>
+								<option value="ADMIN">Admin</option>
+							</select>
+						</div>
+					</div>
+					<div class="mt-6">
+						<button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline">
+							Create User
+						</button>
+					</div>
+				</form>
+				<h3 class="text-lg font-semibold mb-4 text-gray-700">Existing Users</h3>
+				<div class="overflow-x-auto">
+					<table class="min-w-full bg-white">
+						<thead class="bg-gray-100">
+							<tr>
+								<th class="text-left py-3 px-4 font-medium text-gray-600">Name</th>
+								<th class="text-left py-3 px-4 font-medium text-gray-600">Email</th>
+								<th class="text-left py-3 px-4 font-medium text-gray-600">Role</th>
+								<th class="text-left py-3 px-4 font-medium text-gray-600">DNI</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, user := range props.Users {
+								<tr class="border-b border-gray-200 hover:bg-gray-50">
+									<td class="py-3 px-4">{ user.Name }</td>
+									<td class="py-3 px-4">{ user.Email }</td>
+									<td class="py-3 px-4">
+										<span
+											class="px-2 py-1 text-xs font-semibold rounded-full"
+											if user.Role == "ADMIN" {
+												class="bg-green-100 text-green-800"
+											}
+											else
+											if user.Role == "TECNICO" {
+												class="bg-yellow-100 text-yellow-800"
+											}
+										>{ string(user.Role) }</span>
+									</td>
+									<td class="py-3 px-4">{ user.Dni }</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	}
+}

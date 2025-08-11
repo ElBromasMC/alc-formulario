@@ -1,0 +1,428 @@
+package view
+
+import (
+	"alc/repository"
+	"fmt"
+	"os"
+	"time"
+)
+
+// CertificatePageProps holds all the data needed to render the certificate form.
+type CertificatePageProps struct {
+	TechnicianName   string
+	CurrentDate      string
+	StandardSoftware []repository.Software
+	StandardConfig   []repository.ConfigurationItem
+	Peripherals      []repository.Peripheral
+}
+
+templ CertificateFormBody(props CertificatePageProps) {
+	<div id="certificate-form-body">
+		<header>
+			<img src="/static/img/lenovo.svg" alt="Lenovo Logo" class="lenovo-logo"/>
+			<img src="/static/img/alicorp.svg" alt="Alicorp Logo" class="alicorp-logo"/>
+		</header>
+		<h1 class="title">ACTA DE ASIGNACIÓN Y RECUPERACIÓN</h1>
+		<div class="section">
+			<div class="section-header">
+				<div class="header-grid">
+					<div class="form-group full-span"><label>Nombre del Proyecto:</label><input type="text" name="project_name" value="ROLLOUT ALICORP 2025" readonly style="background: transparent; color: white; border-bottom: 1px solid white;"/></div>
+					<div class="form-group"><label>Responsable de Actualización:</label><input type="text" name="responsible_update" value="LENOVO" readonly style="background: transparent; color: white; border-bottom: 1px solid white;"/></div>
+					<div class="form-group">
+						<label>Código de Usuario:</label>
+						<input
+							type="text"
+							name="machine_user_dni"
+							style="background: transparent; color: white; border-bottom: 1px solid white;"
+							hx-get="/api/machine-user"
+							hx-trigger="keyup changed delay:500ms, blur"
+							hx-target="#user-details-fragment"
+							hx-swap="outerHTML"
+							hx-indicator="#user-spinner"
+							autocomplete="off"
+							required
+						/>
+						<span id="user-spinner" class="htmx-indicator">...</span>
+					</div>
+					<div class="form-group"><label>Fecha de última actualización:</label><input type="text" name="update_date" value={ props.CurrentDate } readonly style="background: transparent; color: white; border-bottom: 1px solid white;"/></div>
+					<div class="form-group">
+						<label>Sociedad:</label>
+						<input
+							type="text"
+							name="machine_user_society"
+							id="machine_user_society_field"
+							style="background: transparent; color: white; border-bottom: 1px solid white;"
+						/>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="user-details-fragment" class="user-info-grid">
+			<div class="form-group"><label>Usuario:</label><input type="text" name="machine_user_name"/></div>
+			<div class="form-group"><label>Ticket:</label><input type="text" name="ticket_name" required/></div>
+			<div class="form-group"><label>Area:</label><input type="text" name="machine_user_area"/></div>
+			<div class="form-group"><label>Correo:</label><input type="email" name="machine_user_email"/></div>
+			<div class="form-group"><label>Sede:</label><input type="text" name="machine_user_site"/></div>
+			<div class="form-group"><label>Piso:</label><input type="text" name="machine_user_floor"/></div>
+		</div>
+		<div class="equipo-sections">
+			<div class="section">
+				<div class="section-header">DATOS DEL EQUIPO ASIGNADO</div>
+				<div class="equipo-grid">
+					<div class="form-group">
+						<label>Número de Serie:</label>
+						<input
+							type="text"
+							name="new_device_serial"
+							required
+							hx-get="/api/machine"
+							hx-trigger="keyup changed delay:500ms, blur"
+							autocomplete="off"
+							hx-target="this"
+							hx-swap="none"
+						/>
+					</div>
+					<div id="new_device_type_group" class="form-group">
+						<label>Tipo:</label>
+						<input type="radio" id="new_type_pc" name="new_device_type" value="PC"/><label for="new_type_pc">Pc</label>
+						<input type="radio" id="new_type_laptop" name="new_device_type" value="LAPTOP" checked/><label for="new_type_laptop">Laptop</label>
+					</div>
+					<div class="hidden full-width" id="new-device-serial-feedback"></div>
+					<div class="form-group">
+						<label>Nombre del Equipo:</label>
+						<input id="new_device_hostname" type="text" name="new_device_hostname"/>
+					</div>
+					<div class="form-group">
+						<label>Categoría:</label>
+						<select id="new_device_profile" name="new_device_profile">
+							<option value="REGULAR" selected>Regular</option>
+							<option value="PROCESAMIENTO">Procesamiento</option>
+							<option value="ESPECIAL1">Especial 1</option>
+							<option value="ESPECIAL2">Especial 2</option>
+						</select>
+					</div>
+					<div id="new_device_status_group" class="form-group full-width">
+						<label>Estado del Equipo:</label>
+						<input type="radio" id="new_status_asignacion" name="new_device_status" value="ASIGNACION" checked/><label for="new_status_asignacion">Asignación</label>
+						<input type="radio" id="new_status_prestamo" name="new_device_status" value="PRESTAMO"/><label for="new_status_prestamo">Préstamo</label>
+						<input type="radio" id="new_status_backup" name="new_device_status" value="BACKUP"/><label for="new_status_backup">Backup</label>
+					</div>
+					<div class="form-group full-width">
+						<label>Tamaño de Disco:</label>
+						<input id="new_device_disk" type="text" name="new_device_disk"/>
+					</div>
+					<div class="form-group full-width">
+						<label>Tamaño de memoria:</label>
+						<input id="new_device_memory" type="text" name="new_device_memory"/>
+					</div>
+					<div class="form-group">
+						<label>Código Equipo:</label>
+						<input id="new_device_code" type="text" name="new_device_code" required/>
+					</div>
+					<div class="form-group">
+						<label>Modelo:</label>
+						<input id="new_device_model" type="text" name="new_device_model"/>
+					</div>
+				</div>
+			</div>
+			<div class="section">
+				<div class="section-header">DATOS DE EQUIPO LIBERADO</div>
+				<div class="equipo-grid">
+					<div class="form-group"><label>Número de Serie:</label><input type="text" name="old_device_serial" required/></div>
+					<div class="form-group">
+						<label>Tipo:</label>
+						<input type="radio" id="old_type_pc" name="old_device_type" value="PC"/><label for="old_type_pc">Pc</label>
+						<input type="radio" id="old_type_laptop" name="old_device_type" value="LAPTOP" checked/><label for="old_type_laptop">Laptop</label>
+					</div>
+					<div class="form-group full-width"><label>Nombre del Equipo:</label><input type="text" name="old_device_hostname"/></div>
+					<div class="form-group full-width">
+						<label>Estado del Equipo:</label>
+						<input type="radio" id="old_status_recuperacion" name="old_device_status" value="RECUPERACION" checked/><label for="old_status_recuperacion">Recuperación</label>
+					</div>
+					<div class="form-group full-width"><label>Tamaño de Disco:</label><input type="text" name="old_device_disk"/></div>
+					<div class="form-group full-width"><label>Tamaño de memoria:</label><input type="text" name="old_device_memory"/></div>
+					<div class="form-group"><label>Código Equipo:</label><input type="text" name="old_device_code" required/></div>
+					<div class="form-group"><label>Modelo:</label><input type="text" name="old_device_model"/></div>
+				</div>
+			</div>
+		</div>
+		<div class="main-layout">
+			<div class="left-column">
+				<div class="section">
+					<div class="section-header">SOFTWARE ESTANDAR</div>
+					<table class="table">
+						<tbody>
+							for _, sw := range props.StandardSoftware {
+								<tr>
+									<td>{ sw.Name }</td>
+									<td><input type="checkbox" name="standard_software" value={ fmt.Sprint(sw.SoftwareID) }/></td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+				<div class="section">
+					<div class="section-header">IMPRESORA</div>
+					<table class="table">
+						<tbody>
+							<tr><td>Nombre: <input type="text" name="printer_name" style="width: 180px;"/></td></tr>
+							<tr><td>IP: <input type="text" name="printer_ip" style="width: 200px;"/></td></tr>
+							<tr><td>Prueba de impresión <input type="checkbox" name="printer_test"/></td></tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="right-column">
+				<div class="section">
+					<div class="section-header">DATOS DE PERIFERICOS</div>
+					<table class="table">
+						<thead>
+							<tr>
+								<th style="width: 25%;"></th>
+								<th style="width: 40%;">Placa</th>
+								<th>S/N</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, p := range props.Peripherals {
+								<tr>
+									<td>{ p.Name }:</td>
+									<td><input type="text" name={ "peripheral_plate_" + fmt.Sprint(p.PeripheralID) }/></td>
+									<td><input type="text" name={ "peripheral_sn_" + fmt.Sprint(p.PeripheralID) }/></td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+				<div class="section">
+					<div class="section-header">SW ADICIONAL (según usuario)</div>
+					<textarea name="additional_software" class="textarea-sw"></textarea>
+				</div>
+				<div class="section">
+					<div class="section-header">CONFIGURACIÓN ESTANDAR</div>
+					<table class="table">
+						<tbody>
+							for _, item := range props.StandardConfig {
+								<tr>
+									<td>{ item.Name }</td>
+									<td><input type="checkbox" name="standard_config" value={ fmt.Sprint(item.ItemID) }/></td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+				<div class="section">
+					<div class="section-header">DATA DEL USUARIO</div>
+					<table class="table">
+						<tbody>
+							<tr><td>Disco C:\ tamaño: <input type="text" name="disk_c_size" style="width: 100px;"/></td></tr>
+							<tr><td>Disco D:\ tamaño: <input type="text" name="disk_d_size" style="width: 100px;"/></td></tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+		<div class="section full-width">
+			<div class="section-header">OBSERVACIONES</div>
+			<textarea name="comments" class="textarea-obs"></textarea>
+		</div>
+		<footer>
+			<div>
+				<div class="signature-field">Firma del Técnico Soporte on site</div>
+				<label>Nombre: { props.TechnicianName }</label>
+			</div>
+			<div>
+				<div class="signature-field">Firma del Usuario</div>
+				<label id="signature_user_name">Nombre:</label>
+			</div>
+			<div>
+				<div class="signature-field">Fecha (dd/mm/aa)</div>
+			</div>
+		</footer>
+	</div>
+}
+
+templ CertificateForm(props CertificatePageProps) {
+	<!DOCTYPE html>
+	<html lang="es">
+		<head>
+			<meta charset="UTF-T"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Acta de Asignación - Alicorp</title>
+			if os.Getenv("ENV") == "development" {
+				<!-- Live reload -->
+				<script src="/static/js/live-reload.js"></script>
+				<script src={ fmt.Sprintf("/static/js/main.js?v=%s", time.Now().Format("20060102150405")) } defer></script>
+				<link href={ fmt.Sprintf("/static/css/tailwind.css?v=%s", time.Now().Format("20060102150405")) } rel="stylesheet"/>
+			} else {
+				<script src={ fmt.Sprintf("/static/js/main.js?v=%s", os.Getenv("REL")) } defer></script>
+				<link href={ fmt.Sprintf("/static/css/tailwind.css?v=%s", os.Getenv("REL")) } rel="stylesheet"/>
+			}
+			<!-- HTMX -->
+			<script src="/static/js/htmx.min.js" defer></script>
+			<link rel="icon" href="/static/img/favicon.webp"/>
+			<style>
+				:root {
+					--a4-width: 210mm;
+					--a4-height: 297mm;
+				}
+				body {
+					font-family: Arial, Helvetica, sans-serif;
+					font-size: 9px;
+					background-color: #e0e0e0;
+					margin: 0;
+					display: flex;
+					justify-content: center;
+					padding: 20px 0;
+				}
+				.a4-sheet {
+					width: var(--a4-width);
+					min-height: calc(var(--a4-height) - 4mm);
+					background-color: #fff;
+					padding: 10mm;
+					box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+					box-sizing: border-box;
+				}
+				form {
+					width: 100%;
+					height: 100%;
+				}
+				header {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					border-bottom: 3px solid #d9001b;
+					padding-bottom: 6px;
+					margin-bottom: 5px;
+				}
+				header .lenovo-logo { width: 100px; }
+				header .alicorp-logo { width: 140px; }
+				.title { text-align: center; font-size: 16px; font-weight: bold; margin: 10px 0; color: #333; }
+				.section { margin-bottom: 6px; }
+				.section-header {
+					background-color: #003366;
+					color: white;
+					padding: 3px 6px;
+					font-weight: bold;
+					font-size: 10px;
+					border: 1px solid #003366;
+				}
+				.header-grid {
+					display: grid;
+					grid-template-columns: 1fr 1fr;
+					gap: 3px 15px;
+					align-items: center;
+				}
+				.header-grid .full-span { grid-column: 1 / -1; }
+				.header-grid .form-group { margin-bottom: 0; }
+				.header-grid .form-group label { color: white; }
+				.equipo-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+				.main-layout { display: grid; grid-template-columns: 55% 1fr; gap: 10px; align-items: start; }
+				.form-group { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
+				.form-group label { white-space: nowrap; font-size: 9px; }
+				input { font-size: 9px; font-family: Arial, Helvetica, sans-serif; }
+				input[type="text"], input[type="email"], datalist {
+					width: 100%;
+					border: none;
+					border-bottom: 1px solid #333;
+					padding: 2px 1px;
+					background-color: transparent;
+				}
+				input[type="text"]:focus, input[type="email"]:focus { outline: none; border-bottom: 1px solid #003366; }
+
+				select {
+					-webkit-appearance: none;
+					appearance: none;
+					width: 100%;
+					border: none;
+					border-bottom: 1px solid #333;
+					padding: 2px 20px 2px 1px;
+					background-color: transparent;
+					font-size: 9px;
+					font-family: Arial, Helvetica, sans-serif;
+					background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23333333' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+					background-repeat: no-repeat;
+					background-position: right 0px center;
+					background-size: 12px;
+				}
+				select:focus {
+					outline: none;
+					border-bottom: 1px solid #003366;
+				}
+
+				.user-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px 10px; margin: 8px 0; }
+				.user-info-grid .form-group { margin-bottom: 0; }
+				.full-width { grid-column: 1 / -1; }
+				.equipo-grid { padding: 6px; border: 1px solid #ccc; border-top: none; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; }
+				.equipo-grid .form-group label { font-weight: bold; }
+				.table { width: 100%; border-collapse: collapse; }
+				.table th, .table td { border: 1px solid #ccc; padding: 3px; text-align: left; font-size: 9px; vertical-align: middle; }
+				.table th { background-color: #e9ecef; font-weight: bold; }
+				.table td:first-child { width: auto; }
+				.table td:last-child { text-align: center; width: 30px; }
+				.table td input[type="checkbox"] { margin: 0; }
+				.table input[type="text"] { width: 95%; }
+				textarea {
+					width: 100%;
+					border: 1px solid #ccc;
+					padding: 3px;
+					font-family: Arial, Helvetica, sans-serif;
+					font-size: 9px;
+					resize: vertical;
+				}
+				.textarea-obs { height: 40px; }
+				.textarea-sw { height: 90px; }
+				footer { margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding-top: 8px; }
+				footer .signature-field { border-top: 1px solid #000; padding-top: 3px; font-size: 9px; }
+				footer label { display: block; font-size: 9px; }
+				.submit-button-container {
+					display: flex;
+					justify-content: center;
+					padding: 15px;
+				}
+				.submit-button {
+					background-color: #d9001b;
+					color: white;
+					padding: 10px 40px;
+					border: none;
+					border-radius: 5px;
+					font-size: 14px;
+					font-weight: bold;
+					cursor: pointer;
+					transition: background-color 0.3s;
+				}
+				.submit-button:hover { background-color: #a30014; }
+
+				@media print {
+					body { background-color: #fff; padding: 0; margin: 0; }
+					.a4-sheet { width: 100%; min-height: initial; box-shadow: none; border: none; padding: 0; margin: 0; }
+					.section, .table, .equipo-sections, .submit-button-container { page-break-inside: avoid; }
+					.section-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+					.submit-button { display: none; }
+				}
+			</style>
+		</head>
+		<body>
+			<div class="a4-sheet">
+				<form
+					method="POST"
+					hx-post="/certificates/new"
+					hx-target="#certificate-form-body"
+					hx-swap="outerHTML"
+					autocomplete="off"
+				>
+					@CertificateFormBody(props)
+					<div id="form-feedback" class="text-center p-2 h-8"></div>
+					<div class="submit-button-container">
+						<button type="submit" class="submit-button">
+							<span class="htmx-no-indicator">Solicitar conformidad</span>
+						</button>
+					</div>
+					<div class="flex justify-center">
+						<span class="htmx-indicator">Guardando...</span>
+					</div>
+				</form>
+			</div>
+		</body>
+	</html>
+}
