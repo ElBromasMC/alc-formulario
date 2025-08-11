@@ -1,0 +1,114 @@
+package view
+
+import (
+	"alc/model"
+	"alc/repository"
+	"fmt"
+)
+
+type DashboardPageProps struct {
+	User        model.AuthenticatedUser
+	AdminStats  repository.GetDashboardStatsRow
+	RecentCerts []repository.GetRecentCertificatesByTechnicianRow
+}
+
+templ AdminDashboard(props DashboardPageProps) {
+	<div class="p-4 sm:p-8 bg-slate-50 min-h-screen">
+		<div class="flex flex-wrap justify-between items-center mb-8 gap-4">
+			<div>
+				<h1 class="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+				<p class="text-gray-600">¡Bienvenido, { props.User.Name }!</p>
+			</div>
+			<a href="/logout" class="text-sm font-medium text-blue-600 hover:underline">Cerrar Sesión</a>
+		</div>
+		<!-- Stats Cards -->
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+			<div class="bg-white p-6 rounded-lg shadow-md">
+				<h3 class="text-lg font-semibold text-gray-700">Certificados Totales</h3>
+				<p class="text-4xl font-bold text-blue-600 mt-2">{ fmt.Sprint(props.AdminStats.TotalCertificates) }</p>
+			</div>
+			<div class="bg-white p-6 rounded-lg shadow-md">
+				<h3 class="text-lg font-semibold text-gray-700">Técnicos Registrados</h3>
+				<p class="text-4xl font-bold text-green-600 mt-2">{ fmt.Sprint(props.AdminStats.TotalAppUsers) }</p>
+			</div>
+			<div class="bg-white p-6 rounded-lg shadow-md">
+				<h3 class="text-lg font-semibold text-gray-700">Usuarios de Máquina</h3>
+				<p class="text-4xl font-bold text-orange-600 mt-2">{ fmt.Sprint(props.AdminStats.TotalMachineUsers) }</p>
+			</div>
+		</div>
+		<!-- Action Links -->
+		<div class="bg-white p-6 rounded-lg shadow-md">
+			<h3 class="text-xl font-semibold text-gray-700 mb-4">Acciones Rápidas</h3>
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+				<a href="/certificates/new" class="block text-center p-4 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 transition-colors">Crear Certificado</a>
+				<a href="/admin" class="block text-center p-4 bg-indigo-500 text-white font-bold rounded-lg hover:bg-indigo-600 transition-colors">Gestionar Datos</a>
+				<a href="/admin/report/download" class="block text-center p-4 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition-colors">Descargar Reporte</a>
+			</div>
+		</div>
+	</div>
+}
+
+templ TecnicoDashboard(props DashboardPageProps) {
+	<div class="p-4 sm:p-8 bg-slate-50 min-h-screen">
+		<div class="flex justify-between items-center mb-8">
+			<div>
+				<h1 class="text-3xl font-bold text-gray-800">Dashboard de Técnico</h1>
+				<p class="text-gray-600">¡Bienvenido, { props.User.Name }!</p>
+			</div>
+			<a href="/logout" class="text-sm font-medium text-blue-600 hover:underline">Cerrar Sesión</a>
+		</div>
+		<!-- Main Action -->
+		<div class="bg-white p-8 rounded-lg shadow-md mb-8 text-center">
+			<h2 class="text-2xl font-semibold text-gray-700 mb-4">¿Listo para un nuevo registro?</h2>
+			<a href="/certificates/new" class="inline-block px-12 py-4 bg-blue-600 text-white font-bold text-lg rounded-lg hover:bg-blue-700 transition-colors shadow-lg">
+				Crear Nuevo Certificado
+			</a>
+		</div>
+		<!-- Recent Certificates -->
+		<div class="bg-white p-6 rounded-lg shadow-md">
+			<h3 class="text-xl font-semibold text-gray-700 mb-4">Tus Certificados Recientes</h3>
+			if len(props.RecentCerts) == 0 {
+				<p class="text-gray-500">Aún no has creado ningún certificado.</p>
+			} else {
+				<div class="overflow-x-auto">
+					<table class="min-w-full">
+						<thead class="bg-gray-100">
+							<tr>
+								<th class="text-left py-2 px-4 font-medium text-gray-600">Ticket</th>
+								<th class="text-left py-2 px-4 font-medium text-gray-600">Usuario de Máquina</th>
+								<th class="text-left py-2 px-4 font-medium text-gray-600">Fecha</th>
+								<th class="text-left py-2 px-4 font-medium text-gray-600">Estado</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, cert := range props.RecentCerts {
+								<tr class="border-b border-gray-200 hover:bg-gray-50">
+									<td class="py-3 px-4">{ cert.TicketName }</td>
+									<td class="py-3 px-4">{ cert.MachineUserName }</td>
+									<td class="py-3 px-4">{ cert.CreatedAt.Time.Format("02 Jan 2006 15:04") }</td>
+									<td class="py-3 px-4">
+										if cert.ConfirmationStatus == repository.CertificateStatusCONFIRMED {
+											<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Confirmado</span>
+										} else {
+											<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ DashboardPage(props DashboardPageProps) {
+	@BasePage("Dashboard") {
+		if props.User.Role == repository.UserRoleADMIN {
+			@AdminDashboard(props)
+		} else {
+			@TecnicoDashboard(props)
+		}
+	}
+}
