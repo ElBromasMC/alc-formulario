@@ -19,9 +19,10 @@ or
 
 ```shell
 # Env for the application
-POSTGRESQL_URL="postgres://postgres:LlaveSecreta01@db:5432/jrdelperu?sslmode=disable"
+POSTGRESQL_URL="postgres://postgres:LlaveSecreta01@db:5432/alc-formulario?sslmode=disable"
 SESSION_KEY="LlaveSecreta02"
 REL="1"
+APP_ADMIN_PASSWORD="qwerty\$321"
 
 # Env for the database
 POSTGRES_PASSWORD="LlaveSecreta01"
