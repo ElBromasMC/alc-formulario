@@ -7,7 +7,7 @@ SELECT
 -- name: GetRecentCertificatesByTechnician :many
 SELECT
     c.certificate_id,
-    c.ticket_name,
+    c.new_device_code,
     c.created_at,
     c.confirmation_status,
     mu.name as machine_user_name
@@ -18,6 +18,5 @@ JOIN
 WHERE
     c.app_user_id = $1
 ORDER BY
-    c.created_at DESC
-LIMIT 5;
+    c.created_at DESC;
 

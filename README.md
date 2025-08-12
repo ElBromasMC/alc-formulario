@@ -23,6 +23,12 @@ POSTGRESQL_URL="postgres://postgres:LlaveSecreta01@db:5432/alc-formulario?sslmod
 SESSION_KEY="LlaveSecreta02"
 REL="1"
 APP_ADMIN_PASSWORD="qwerty\$321"
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-username
+SMTP_PASS=your-password
+SMTP_SENDER="Alicorp Rollout <no-reply@yourdomain.com>"
+APP_BASE_URL=http://localhost:8080
 
 # Env for the database
 POSTGRES_PASSWORD="LlaveSecreta01"

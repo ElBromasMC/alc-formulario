@@ -45,6 +45,7 @@ templ AdminDashboard(props DashboardPageProps) {
 				<a href="/admin/report/download" class="block text-center p-4 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition-colors">Descargar Reporte</a>
 			</div>
 		</div>
+		@RecentCertificates(props)
 	</div>
 }
 
@@ -64,42 +65,7 @@ templ TecnicoDashboard(props DashboardPageProps) {
 				Crear Nuevo Certificado
 			</a>
 		</div>
-		<!-- Recent Certificates -->
-		<div class="bg-white p-6 rounded-lg shadow-md">
-			<h3 class="text-xl font-semibold text-gray-700 mb-4">Tus Certificados Recientes</h3>
-			if len(props.RecentCerts) == 0 {
-				<p class="text-gray-500">Aún no has creado ningún certificado.</p>
-			} else {
-				<div class="overflow-x-auto">
-					<table class="min-w-full">
-						<thead class="bg-gray-100">
-							<tr>
-								<th class="text-left py-2 px-4 font-medium text-gray-600">Ticket</th>
-								<th class="text-left py-2 px-4 font-medium text-gray-600">Usuario de Máquina</th>
-								<th class="text-left py-2 px-4 font-medium text-gray-600">Fecha</th>
-								<th class="text-left py-2 px-4 font-medium text-gray-600">Estado</th>
-							</tr>
-						</thead>
-						<tbody>
-							for _, cert := range props.RecentCerts {
-								<tr class="border-b border-gray-200 hover:bg-gray-50">
-									<td class="py-3 px-4">{ cert.TicketName }</td>
-									<td class="py-3 px-4">{ cert.MachineUserName }</td>
-									<td class="py-3 px-4">{ cert.CreatedAt.Time.Format("02 Jan 2006 15:04") }</td>
-									<td class="py-3 px-4">
-										if cert.ConfirmationStatus == repository.CertificateStatusCONFIRMED {
-											<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Confirmado</span>
-										} else {
-											<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>
-										}
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				</div>
-			}
-		</div>
+		@RecentCertificates(props)
 	</div>
 }
 
@@ -111,4 +77,51 @@ templ DashboardPage(props DashboardPageProps) {
 			@TecnicoDashboard(props)
 		}
 	}
+}
+
+templ RecentCertificates(props DashboardPageProps) {
+	<!-- Recent Certificates -->
+	<div class="bg-white p-6 rounded-lg shadow-md">
+		<h3 class="text-xl font-semibold text-gray-700 mb-4">Tus Certificados Recientes</h3>
+		if len(props.RecentCerts) == 0 {
+			<p class="text-gray-500">Aún no has creado ningún certificado.</p>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="min-w-full">
+					<thead class="bg-gray-100">
+						<tr>
+							<th class="text-left py-2 px-4 font-medium text-gray-600">Código Equipo</th>
+							<th class="text-left py-2 px-4 font-medium text-gray-600">Usuario de Máquina</th>
+							<th class="text-left py-2 px-4 font-medium text-gray-600">Fecha</th>
+							<th class="text-left py-2 px-4 font-medium text-gray-600">Estado</th>
+							<th class="text-left py-2 px-4 font-medium text-gray-600">Acciones</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, cert := range props.RecentCerts {
+							<tr class="border-b border-gray-200 hover:bg-gray-50">
+								<td class="py-3 px-4">{ cert.NewDeviceCode }</td>
+								<td class="py-3 px-4">{ cert.MachineUserName }</td>
+								<td class="py-3 px-4">{ FormatInLima(cert.CreatedAt, "02 Jan 2006 15:04") }</td>
+								<td class="py-3 px-4">
+									if cert.ConfirmationStatus == repository.CertificateStatusCONFIRMED {
+										<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Confirmado</span>
+									} else if cert.ConfirmationStatus == repository.CertificateStatusREJECTED {
+										<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Rechazado</span>
+									} else {
+										<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>
+									}
+								</td>
+								<td class="py-3 px-4 text-center">
+									if cert.ConfirmationStatus == repository.CertificateStatusREJECTED {
+										<a href={ templ.URL(fmt.Sprintf("/certificate/edit/%d", cert.CertificateID)) } class="text-sm font-medium text-blue-600 hover:underline">Editar</a>
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
 }

@@ -63,3 +63,47 @@ GROUP BY
 ORDER BY
     c.created_at DESC;
 
+-- name: GetCertificateDetailsByToken :one
+SELECT
+    c.*,
+    au.name AS technician_name,
+    mu.*,
+    -- New Device Info
+    nd.hostname AS new_device_hostname,
+    nd.status AS new_device_status,
+    nd.additional_software,
+    nm.serial_num AS new_machine_serial,
+    nm.type AS new_machine_type,
+    nm.model AS new_machine_model,
+    nm.disk_size AS new_machine_disk,
+    nm.memory_size AS new_machine_memory,
+    nm.profile AS new_machine_profile,
+    -- Old Device Info
+    od.hostname AS old_device_hostname,
+    om.serial_num AS old_machine_serial,
+    om.type AS old_machine_type,
+    om.model AS old_machine_model,
+    om.disk_size AS old_machine_disk,
+    om.memory_size AS old_machine_memory,
+    -- Aggregated Data
+    ARRAY_TO_STRING(ARRAY_AGG(DISTINCT s.name), ', ') AS software_list,
+    ARRAY_TO_STRING(ARRAY_AGG(DISTINCT ci.name), ', ') AS config_item_list,
+    ARRAY_TO_STRING(ARRAY_AGG(DISTINCT p.name || ' (Placa: ' || dp.plate_num || ', S/N: ' || dp.serial_num || ')'), '; ') AS peripheral_list
+FROM
+    alicorp_2025_certificates c
+JOIN app_users au ON c.app_user_id = au.user_id
+JOIN machine_users mu ON c.machine_user_dni = mu.dni
+JOIN devices nd ON c.new_device_code = nd.device_code
+JOIN machines nm ON nd.machine_serial_num = nm.serial_num
+LEFT JOIN devices od ON c.old_device_code = od.device_code
+LEFT JOIN machines om ON od.machine_serial_num = om.serial_num
+LEFT JOIN device_software ds ON nd.device_code = ds.device_code
+LEFT JOIN software s ON ds.software_id = s.software_id
+LEFT JOIN device_configuration dc ON nd.device_code = dc.device_code
+LEFT JOIN configuration_items ci ON dc.item_id = ci.item_id
+LEFT JOIN device_peripherals dp ON nd.device_code = dp.device_code
+LEFT JOIN peripherals p ON dp.peripheral_id = p.peripheral_id
+WHERE c.confirmation_token = $1
+GROUP BY
+    c.certificate_id, au.user_id, mu.dni, nd.device_code, nm.serial_num, od.device_code, om.serial_num;
+

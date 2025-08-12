@@ -64,3 +64,25 @@ DELETE FROM device_configuration WHERE device_code = $1;
 -- name: ClearDevicePeripherals :exec
 DELETE FROM device_peripherals WHERE device_code = $1;
 
+-- name: GetCertificateByToken :one
+SELECT
+    c.*,
+    m.plate_num AS new_device_plate,
+    m.serial_num AS new_device_serial,
+    m.model AS new_device_model
+FROM
+    alicorp_2025_certificates c
+JOIN devices d ON c.new_device_code = d.device_code
+JOIN machines m ON d.machine_serial_num = m.serial_num
+WHERE
+    c.confirmation_token = $1;
+
+-- name: UpdateCertificateStatus :exec
+UPDATE alicorp_2025_certificates
+SET
+    confirmation_status = $1,
+    confirmed_at = NOW(),
+    updated_at = NOW()
+WHERE
+    confirmation_token = $2 AND confirmation_status = 'PENDING';
+

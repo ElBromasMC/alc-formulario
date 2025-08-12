@@ -5,6 +5,12 @@ services:
       - SESSION_KEY=${SESSION_KEY}
       - REL=${REL}
       - APP_ADMIN_PASSWORD=${APP_ADMIN_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_SENDER=${SMTP_SENDER}
+      - APP_BASE_URL=${APP_BASE_URL}
   db:
     image: docker.io/postgres:16-alpine
     user: postgres

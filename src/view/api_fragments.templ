@@ -8,7 +8,7 @@ import "alc/repository"
 templ MachineUserDetails(user repository.MachineUser) {
 	<div id="user-details-fragment" hx-swap-oob="true" class="user-info-grid">
 		<div class="form-group"><label>Usuario:</label><input type="text" name="machine_user_name" value={ user.Name }/></div>
-		<div class="form-group"><label>Ticket:</label><input type="text" name="ticket_name" required/></div>
+		<div class="form-group"><label>Ticket:</label><input type="text" name="ticket_name"/></div>
 		<div class="form-group"><label>Area:</label><input type="text" name="machine_user_area" value={ user.Area }/></div>
 		<div class="form-group"><label>Correo:</label><input type="email" name="machine_user_email" value={ user.Email }/></div>
 		<div class="form-group"><label>Sede:</label><input type="text" name="machine_user_site" value={ user.Site }/></div>
@@ -30,7 +30,7 @@ templ MachineUserNotFound() {
 	<div id="user-details-fragment" hx-swap-oob="true" class="user-info-grid">
 		<p class="text-red-500 col-span-3">Usuario no encontrado.</p>
 		<div class="form-group"><label>Usuario:</label><input type="text" name="machine_user_name"/></div>
-		<div class="form-group"><label>Ticket:</label><input type="text" name="ticket_name" required/></div>
+		<div class="form-group"><label>Ticket:</label><input type="text" name="ticket_name"/></div>
 		<div class="form-group"><label>Area:</label><input type="text" name="machine_user_area"/></div>
 		<div class="form-group"><label>Correo:</label><input type="email" name="machine_user_email"/></div>
 		<div class="form-group"><label>Sede:</label><input type="text" name="machine_user_site"/></div>

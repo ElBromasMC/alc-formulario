@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/mail"
 	"net/url"
 	"strconv"
@@ -17,14 +18,16 @@ import (
 )
 
 type CertificateService struct {
-	DBPool *pgxpool.Pool
-	Repo   *repository.Queries
+	DBPool   *pgxpool.Pool
+	Repo     *repository.Queries
+	EmailSvc *EmailService
 }
 
-func NewCertificateService(db *pgxpool.Pool, r *repository.Queries) *CertificateService {
+func NewCertificateService(db *pgxpool.Pool, r *repository.Queries, emailSvc *EmailService) *CertificateService {
 	return &CertificateService{
-		DBPool: db,
-		Repo:   r,
+		DBPool:   db,
+		Repo:     r,
+		EmailSvc: emailSvc,
 	}
 }
 
@@ -107,7 +110,7 @@ func (s *CertificateService) CreateCertificateFromForm(ctx context.Context, user
 
 	// --- 4. Upsert NEW Machine ---
 
-	_, err = qtx.UpsertMachine(ctx, repository.UpsertMachineParams{
+	newMachine, err := qtx.UpsertMachine(ctx, repository.UpsertMachineParams{
 		SerialNum:  newSerial,
 		Type:       repository.MachineType(normalize(form.Get("new_device_type"), true)),
 		Model:      normalize(form.Get("new_device_model"), false),
@@ -254,6 +257,214 @@ func (s *CertificateService) CreateCertificateFromForm(ctx context.Context, user
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+
+	// After successfully committing, send the email
+	go func() {
+		if err := s.EmailSvc.SendConfirmationEmail(context.Background(), machineUser, cert, newMachine); err != nil {
+			log.Printf("ERROR: Failed to send confirmation email for certificate %d: %v", cert.CertificateID, err)
+		}
+	}()
+
+	return &cert, nil
+}
+
+// UpdateCertificateFromForm orchestrates the entire update process in a single transaction.
+func (s *CertificateService) UpdateCertificateFromForm(ctx context.Context, user model.AuthenticatedUser, certID int32, form url.Values) (*repository.Alicorp2025Certificate, error) {
+	// --- 1. DATA VALIDATION AND NORMALIZATION ---
+
+	// Critical fields
+	newDeviceCode := normalize(form.Get("new_device_code"), true)
+	if newDeviceCode == "" {
+		return nil, errors.New("el 'Código Equipo' del equipo asignado no puede estar vacío")
+	}
+	newSerial := normalize(form.Get("new_device_serial"), true)
+	if newSerial == "" {
+		return nil, errors.New("el 'Número de Serie' del equipo asignado no puede estar vacío")
+	}
+	oldDeviceCode := normalize(form.Get("old_device_code"), true)
+	if oldDeviceCode == "" {
+		return nil, errors.New("el 'Código Equipo' del equipo liberado no puede estar vacío")
+	}
+	oldSerial := normalize(form.Get("old_device_serial"), true)
+	if oldSerial == "" {
+		return nil, errors.New("el 'Número de Serie' del equipo liberado no puede estar vacío")
+	}
+	userDNI := normalize(form.Get("machine_user_dni"), true)
+	if userDNI == "" {
+		return nil, errors.New("el 'Código de Usuario' (DNI) no puede estar vacío")
+	}
+
+	// Email validation and normalization
+	userEmail := strings.ToLower(strings.TrimSpace(form.Get("machine_user_email")))
+	if userEmail != "" {
+		if _, err := mail.ParseAddress(userEmail); err != nil {
+			return nil, fmt.Errorf("el formato del correo '%s' no es válido", userEmail)
+		}
+	}
+
+	// --- 2. DATABASE TRANSACTION ---
+
+	tx, err := s.DBPool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.Repo.WithTx(tx)
+
+	// --- 3. Upsert Machine User ---
+
+	machineUser, err := qtx.UpsertMachineUser(ctx, repository.UpsertMachineUserParams{
+		Dni:          userDNI,
+		PersonalCode: normalize(form.Get("machine_user_code"), true),
+		Name:         normalize(form.Get("machine_user_name"), true),
+		Email:        userEmail,
+		Society:      normalize(form.Get("machine_user_society"), true),
+		Site:         normalize(form.Get("machine_user_site"), true),
+		Area:         normalize(form.Get("machine_user_area"), true),
+		FloorName:    normalize(form.Get("machine_user_floor"), true),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upsert machine user: %w", err)
+	}
+
+	// --- 4. Upsert NEW Machine ---
+
+	newMachine, err := qtx.UpsertMachine(ctx, repository.UpsertMachineParams{
+		SerialNum:  newSerial,
+		Type:       repository.MachineType(normalize(form.Get("new_device_type"), true)),
+		Model:      normalize(form.Get("new_device_model"), false),
+		PlateNum:   newDeviceCode,
+		DiskSize:   normalize(form.Get("new_device_disk"), false),
+		MemorySize: normalize(form.Get("new_device_memory"), false),
+		Profile:    repository.MachineProfile(normalize(form.Get("new_device_profile"), true)),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upsert new machine: %w", err)
+	}
+
+	// --- 5. Upsert NEW Device ---
+
+	_, err = qtx.UpsertDevice(ctx, repository.UpsertDeviceParams{
+		DeviceCode:         newDeviceCode,
+		MachineSerialNum:   newSerial,
+		Type:               repository.DeviceTypeNEW,
+		Hostname:           normalize(form.Get("new_device_hostname"), true),
+		Status:             repository.DeviceStatus(normalize(form.Get("new_device_status"), true)),
+		AdditionalSoftware: strings.TrimSpace(form.Get("additional_software")),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upsert new device: %w", err)
+	}
+
+	// --- 6. Upsert OLD Machine & Device ---
+
+	if oldDeviceCode != "" && oldSerial != "" {
+		_, err = qtx.UpsertMachine(ctx, repository.UpsertMachineParams{
+			SerialNum:  oldSerial,
+			Type:       repository.MachineType(normalize(form.Get("old_device_type"), true)),
+			Model:      normalize(form.Get("old_device_model"), false),
+			PlateNum:   oldDeviceCode,
+			DiskSize:   normalize(form.Get("old_device_disk"), false),
+			MemorySize: normalize(form.Get("old_device_memory"), false),
+			Profile:    repository.MachineProfileREGULAR,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to upsert old machine: %w", err)
+		}
+
+		_, err = qtx.UpsertDevice(ctx, repository.UpsertDeviceParams{
+			DeviceCode:         oldDeviceCode,
+			MachineSerialNum:   oldSerial,
+			Type:               repository.DeviceTypeOLD,
+			Hostname:           normalize(form.Get("old_device_hostname"), false),
+			Status:             repository.DeviceStatus(normalize(form.Get("old_device_status"), true)),
+			AdditionalSoftware: "",
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to upsert old device: %w", err)
+		}
+	}
+
+	// --- 7. Clear and add many-to-many relationships for the new device ---
+
+	// Software
+	if err := qtx.ClearDeviceSoftware(ctx, newDeviceCode); err != nil {
+		return nil, fmt.Errorf("failed to clear old device software links: %w", err)
+	}
+	for _, softwareIDStr := range form["standard_software"] {
+		softwareID, _ := strconv.Atoi(softwareIDStr)
+		if softwareID > 0 {
+			if err := qtx.AddSoftwareToDevice(ctx, repository.AddSoftwareToDeviceParams{DeviceCode: newDeviceCode, SoftwareID: int32(softwareID)}); err != nil {
+				return nil, fmt.Errorf("failed to add software link for ID %d: %w", softwareID, err)
+			}
+		}
+	}
+
+	// Configuration Items
+	if err := qtx.ClearDeviceConfiguration(ctx, newDeviceCode); err != nil {
+		return nil, fmt.Errorf("failed to clear old device configuration links: %w", err)
+	}
+	for _, itemIDStr := range form["standard_config"] {
+		itemID, _ := strconv.Atoi(itemIDStr)
+		if itemID > 0 {
+			if err := qtx.AddConfigToDevice(ctx, repository.AddConfigToDeviceParams{DeviceCode: newDeviceCode, ItemID: int32(itemID)}); err != nil {
+				return nil, fmt.Errorf("failed to add config link for ID %d: %w", itemID, err)
+			}
+		}
+	}
+
+	// Peripherals
+	if err := qtx.ClearDevicePeripherals(ctx, newDeviceCode); err != nil {
+		return nil, fmt.Errorf("failed to clear old device peripheral links: %w", err)
+	}
+	for key, values := range form {
+		if strings.HasPrefix(key, "peripheral_plate_") {
+			peripheralIDStr := strings.TrimPrefix(key, "peripheral_plate_")
+			peripheralID, _ := strconv.Atoi(peripheralIDStr)
+			if peripheralID > 0 {
+				plateNum := normalize(values[0], true)
+				serialNum := normalize(form.Get("peripheral_sn_"+peripheralIDStr), true)
+				if plateNum != "" || serialNum != "" {
+					if err := qtx.AddPeripheralToDevice(ctx, repository.AddPeripheralToDeviceParams{DeviceCode: newDeviceCode, PeripheralID: int32(peripheralID), PlateNum: plateNum, SerialNum: serialNum}); err != nil {
+						return nil, fmt.Errorf("failed to add peripheral link for ID %d: %w", peripheralID, err)
+					}
+				}
+			}
+		}
+	}
+
+	// --- 8. UPDATE the Certificate ---
+
+	cert, err := qtx.UpdateCertificate(ctx, repository.UpdateCertificateParams{
+		CertificateID:  certID,
+		AppUserID:      pgtype.UUID{Bytes: user.ID, Valid: true},
+		TicketName:     normalize(form.Get("ticket_name"), false),
+		MachineUserDni: machineUser.Dni,
+		NewDeviceCode:  newDeviceCode,
+		OldDeviceCode:  oldDeviceCode,
+		DiskCSize:      normalize(form.Get("disk_c_size"), false),
+		DiskDSize:      normalize(form.Get("disk_d_size"), false),
+		PrinterName:    normalize(form.Get("printer_name"), false),
+		PrinterIp:      normalize(form.Get("printer_ip"), false),
+		PrinterTest:    form.Get("printer_test") == "on",
+		Comments:       strings.TrimSpace(form.Get("comments")),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update certificate: %w", err)
+	}
+
+	// If all operations were successful, commit the transaction
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// After successfully committing, send the confirmation email again
+	go func() {
+		if err := s.EmailSvc.SendConfirmationEmail(context.Background(), machineUser, cert, newMachine); err != nil {
+			log.Printf("ERROR: Failed to send confirmation email for certificate %d: %v", cert.CertificateID, err)
+		}
+	}()
 
 	return &cert, nil
 }

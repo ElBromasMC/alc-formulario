@@ -1,0 +1,251 @@
+package view
+
+import (
+	"alc/repository"
+	"fmt"
+	"strings"
+)
+
+// Props struct now includes the pre-parsed map for peripherals
+type ViewCertificatePageProps struct {
+	Cert           repository.GetCertificateDetailsByTokenRow
+	AllSoftware    []repository.Software
+	AllConfig      []repository.ConfigurationItem
+	AllPeripherals []repository.Peripheral
+	PeripheralMap  map[string]map[string]string
+}
+
+templ ViewCertificatePage(props ViewCertificatePageProps) {
+	<!DOCTYPE html>
+	<html lang="es">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Acta de Conformidad - { props.Cert.TicketName }</title>
+			<script src="/static/js/htmx.min.js" defer></script>
+			<link rel="icon" href="/static/img/favicon.webp"/>
+			<style>
+				:root { --a4-width: 210mm; --a4-height: 297mm; }
+				body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; background-color: #e0e0e0; margin: 0; display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
+				.a4-sheet { width: var(--a4-width); min-height: calc(var(--a4-height) - 4mm); background-color: #fff; padding: 10mm; box-shadow: 0 0 10px rgba(0,0,0,0.5); box-sizing: border-box; }
+				header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #d9001b; padding-bottom: 6px; margin-bottom: 5px; position: relative; }
+				header .lenovo-logo { width: 100px; }
+				header .alicorp-logo { width: 140px; }
+				.cert-id { position: absolute; left: 50%; transform: translateX(-50%); bottom: -10px; background-color: white; padding: 0 5px; font-weight: bold; font-size: 10px; }
+				.title { text-align: center; font-size: 16px; font-weight: bold; margin: 10px 0; color: #333; }
+				.section { margin-bottom: 6px; }
+				.section-header { background-color: #003366; color: white; padding: 3px 6px; font-weight: bold; font-size: 10px; border: 1px solid #003366; }
+				.header-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 15px; align-items: center; }
+				.header-grid .full-span { grid-column: 1 / -1; }
+				.header-grid .form-group { margin-bottom: 0; }
+				.header-grid .form-group label { color: white; }
+				.header-grid .form-group span { color: white; border-bottom: 1px solid white; }
+				.equipo-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+				.main-layout { display: grid; grid-template-columns: 55% 1fr; gap: 10px; align-items: start; }
+				.form-group { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
+				.form-group label { white-space: nowrap; font-size: 9px; font-weight: bold; }
+				.form-group span { border-bottom: 1px solid #333; padding: 2px 1px; width: 100%; min-height: 14px; display: inline-block; overflow-wrap: break-word; }
+				.user-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px 10px; margin: 8px 0; }
+				.user-info-grid .form-group { margin-bottom: 0; }
+				.full-width { grid-column: 1 / -1; }
+				.equipo-grid { padding: 6px; border: 1px solid #ccc; border-top: none; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; }
+				.equipo-grid .form-group.spaced { margin-bottom: 6px; }
+				.table { width: 100%; border-collapse: collapse; }
+				.table th, .table td { border: 1px solid #ccc; padding: 3px; text-align: left; font-size: 9px; vertical-align: middle; }
+				.table th { background-color: #e9ecef; font-weight: bold; }
+				.table td:first-child { width: auto; }
+				.table td:last-child { text-align: center; width: 30px; }
+				.table td input[type="checkbox"] { margin: 0; }
+				.table span { width: 95%; }
+				.textarea-display { width: 100%; border: 1px solid #ccc; padding: 3px; font-family: Arial, Helvetica, sans-serif; font-size: 9px; min-height: 40px; white-space: pre-wrap; word-wrap: break-word; box-sizing: border-box; }
+				footer { margin-top: 25px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding-top: 8px; }
+				footer .signature-box { text-align: center; }
+				footer .signature-line { border-top: 1px solid #000; padding-top: 3px; font-size: 9px; }
+				footer label { display: block; font-size: 9px; }
+				footer .signature-pre-text { font-size: 9px; font-weight: bold; margin-bottom: 2px; min-height: 12px; }
+				.print-button { margin: 20px; padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+				@media print { body { background-color: #fff; padding: 0; margin: 0; } .a4-sheet { width: 100%; min-height: initial; box-shadow: none; border: none; padding: 0; margin: 0; } .section, .table, .equipo-sections { page-break-inside: avoid; } .section-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .print-button { display: none; } }
+			</style>
+		</head>
+		<body>
+			if props.Cert.ConfirmationStatus == repository.CertificateStatusCONFIRMED {
+				<button class="print-button" onclick="window.print()">Imprimir Acta</button>
+			}
+			<div class="a4-sheet">
+				<header>
+					<img src="/static/img/lenovo.svg" alt="Lenovo Logo" class="lenovo-logo"/>
+					<div class="cert-id">{ fmt.Sprintf("A%04d", props.Cert.CertificateID) }</div>
+					<img src="/static/img/alicorp.svg" alt="Alicorp Logo" class="alicorp-logo"/>
+				</header>
+				<h1 class="title">ACTA DE ASIGNACIÓN Y RECUPERACIÓN</h1>
+				<div class="section">
+					<div class="section-header">
+						<div class="header-grid">
+							<div class="form-group full-span"><label>Nombre del Proyecto:</label><span>ROLLOUT ALICORP 2025</span></div>
+							<div class="form-group"><label>Responsable de Actualización:</label><span>LENOVO</span></div>
+							<div class="form-group"><label>Código de Usuario:</label><span>{ props.Cert.MachineUserDni }</span></div>
+							<div class="form-group"><label>Fecha de última actualización:</label><span>{ FormatInLima(props.Cert.UpdatedAt, "02/01/2006") }</span></div>
+							<div class="form-group"><label>Sociedad:</label><span>{ props.Cert.Society }</span></div>
+						</div>
+					</div>
+				</div>
+				<div class="user-info-grid">
+					<div class="form-group"><label>Usuario:</label><span>{ props.Cert.Name }</span></div>
+					<div class="form-group"><label>Ticket:</label><span>{ props.Cert.TicketName }</span></div>
+					<div class="form-group"><label>Area:</label><span>{ props.Cert.Area }</span></div>
+					<div class="form-group"><label>Correo:</label><span>{ props.Cert.Email }</span></div>
+					<div class="form-group"><label>Sede:</label><span>{ props.Cert.Site }</span></div>
+					<div class="form-group"><label>Piso:</label><span>{ props.Cert.FloorName }</span></div>
+				</div>
+				<div class="equipo-sections">
+					<div class="section">
+						<div class="section-header">DATOS DEL EQUIPO ASIGNADO</div>
+						<div class="equipo-grid">
+							<div class="form-group"><label>Número de Serie:</label><span>{ props.Cert.NewMachineSerial }</span></div>
+							<div class="form-group">
+								<label>Tipo:</label>
+								<input type="radio" checked?={ props.Cert.NewMachineType == repository.MachineTypePC } disabled?={ true }/><label for="new_type_pc">Pc</label>
+								<input type="radio" checked?={ props.Cert.NewMachineType == repository.MachineTypeLAPTOP } disabled?={ true }/><label for="new_type_laptop">Laptop</label>
+							</div>
+							<div class="form-group"><label>Nombre del Equipo:</label><span>{ props.Cert.NewDeviceHostname }</span></div>
+							<div class="form-group"><label>Categoría:</label><span>{ string(props.Cert.NewMachineProfile) }</span></div>
+							<div class="form-group full-width">
+								<label>Estado del Equipo:</label>
+								<input type="radio" checked?={ props.Cert.NewDeviceStatus == repository.DeviceStatusASIGNACION } disabled?={ true }/><label>Asignación</label>
+								<input type="radio" checked?={ props.Cert.NewDeviceStatus == repository.DeviceStatusPRESTAMO } disabled?={ true }/><label>Préstamo</label>
+								<input type="radio" checked?={ props.Cert.NewDeviceStatus == repository.DeviceStatusBACKUP } disabled?={ true }/><label>Backup</label>
+							</div>
+							<div class="form-group full-width"><label>Tamaño de Disco:</label><span>{ props.Cert.NewMachineDisk }</span></div>
+							<div class="form-group full-width"><label>Tamaño de memoria:</label><span>{ props.Cert.NewMachineMemory }</span></div>
+							<div class="form-group"><label>Código Equipo:</label><span>{ props.Cert.NewDeviceCode }</span></div>
+							<div class="form-group"><label>Modelo:</label><span>{ props.Cert.NewMachineModel }</span></div>
+						</div>
+					</div>
+					<div class="section">
+						<div class="section-header">DATOS DE EQUIPO LIBERADO</div>
+						<div class="equipo-grid">
+							<div class="form-group"><label>Número de Serie:</label><span>{ props.Cert.OldMachineSerial.String }</span></div>
+							<div class="form-group">
+								<label>Tipo:</label>
+								<input type="radio" checked?={ props.Cert.OldMachineType.MachineType == repository.MachineTypePC } disabled?={ true }/><label>Pc</label>
+								<input type="radio" checked?={ props.Cert.OldMachineType.MachineType == repository.MachineTypeLAPTOP } disabled?={ true }/><label>Laptop</label>
+							</div>
+							<div class="form-group full-width"><label>Nombre del Equipo:</label><span>{ props.Cert.OldDeviceHostname.String }</span></div>
+							<div class="form-group full-width"><label>Estado del Equipo:</label><input type="radio" checked?={ true } disabled?={ true }/><label>Recuperación</label></div>
+							<div class="form-group full-width"><label>Tamaño de Disco:</label><span>{ props.Cert.OldMachineDisk.String }</span></div>
+							<div class="form-group full-width"><label>Tamaño de memoria:</label><span>{ props.Cert.OldMachineMemory.String }</span></div>
+							<div class="form-group"><label>Código Equipo:</label><span>{ props.Cert.OldDeviceCode }</span></div>
+							<div class="form-group"><label>Modelo:</label><span>{ props.Cert.OldMachineModel.String }</span></div>
+						</div>
+					</div>
+				</div>
+				<div class="main-layout">
+					<div class="left-column">
+						<div class="section">
+							<div class="section-header">SOFTWARE ESTANDAR</div>
+							<table class="table">
+								<tbody>
+									for _, sw := range props.AllSoftware {
+										<tr>
+											<td>{ sw.Name }</td>
+											<td><input type="checkbox" checked?={ strings.Contains(props.Cert.SoftwareList, sw.Name) } disabled?={ true }/></td>
+										</tr>
+									}
+								</tbody>
+							</table>
+						</div>
+						<div class="section">
+							<div class="section-header">IMPRESORA</div>
+							<div class="equipo-grid" style="border: 1px solid #ccc; grid-template-columns: 1fr;">
+								<div class="form-group"><label>Nombre:</label><span>{ props.Cert.PrinterName }</span></div>
+								<div class="form-group"><label>IP:</label><span>{ props.Cert.PrinterIp }</span></div>
+								<div class="form-group" style="justify-content: center;"><label>Prueba de impresión</label><input type="checkbox" checked?={ props.Cert.PrinterTest } disabled?={ true }/></div>
+							</div>
+						</div>
+					</div>
+					<div class="right-column">
+						<div class="section">
+							<div class="section-header">DATOS DE PERIFERICOS</div>
+							<table class="table">
+								<thead>
+									<tr><th style="width: 25%;"></th><th style="width: 40%;">Placa</th><th>S/N</th></tr>
+								</thead>
+								<tbody>
+									for _, p := range props.AllPeripherals {
+										<tr>
+											<td>{ p.Name }:</td>
+											<td><span>{ props.PeripheralMap[p.Name]["Placa"] }</span></td>
+											<td><span>{ props.PeripheralMap[p.Name]["S/N"] }</span></td>
+										</tr>
+									}
+								</tbody>
+							</table>
+						</div>
+						<div class="section">
+							<div class="section-header">SW ADICIONAL (según usuario)</div>
+							<div class="textarea-display">{ props.Cert.AdditionalSoftware }</div>
+						</div>
+						<div class="section">
+							<div class="section-header">CONFIGURACIÓN ESTANDAR</div>
+							<table class="table">
+								<tbody>
+									for _, item := range props.AllConfig {
+										<tr>
+											<td>{ item.Name }</td>
+											<td><input type="checkbox" checked?={ strings.Contains(props.Cert.ConfigItemList, item.Name) } disabled?={ true }/></td>
+										</tr>
+									}
+								</tbody>
+							</table>
+						</div>
+						<div class="section">
+							<div class="section-header">DATA DEL USUARIO</div>
+							<div class="equipo-grid" style="border: 1px solid #ccc; grid-template-columns: 1fr;">
+								<div class="form-group"><label>Disco C:\ tamaño:</label><span>{ props.Cert.DiskCSize }</span></div>
+								<div class="form-group"><label>Disco D:\ tamaño:</label><span>{ props.Cert.DiskDSize }</span></div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="section full-width">
+					<div class="section-header">OBSERVACIONES</div>
+					<div class="textarea-display">{ props.Cert.Comments }</div>
+				</div>
+				<footer>
+					<div class="signature-box">
+						if props.Cert.ConfirmationStatus == repository.CertificateStatusCONFIRMED {
+							<div class="signature-pre-text"></div>
+							<div class="signature-pre-text">EPC-LENOVO</div>
+						} else {
+							<div class="signature-pre-text"></div>
+							<div class="signature-pre-text"></div>
+						}
+						<div class="signature-line">Firma del Técnico Soporte on site</div>
+						<label>Nombre: { props.Cert.TechnicianName }</label>
+					</div>
+					<div class="signature-box">
+						if props.Cert.ConfirmationStatus == repository.CertificateStatusCONFIRMED {
+							<div class="signature-pre-text" style="color: green;">ES CONFORME (CORREO)</div>
+							<div class="signature-pre-text">{ props.Cert.ConfirmationToken.String() }</div>
+						} else {
+							<div class="signature-pre-text"></div>
+							<div class="signature-pre-text"></div>
+						}
+						<div class="signature-line">Firma del Usuario</div>
+						<label>Nombre: { props.Cert.Name }</label>
+					</div>
+					<div class="signature-box">
+						if props.Cert.ConfirmationStatus == repository.CertificateStatusCONFIRMED {
+							<div class="signature-pre-text"></div>
+							<div class="signature-pre-text">{ FormatInLima(props.Cert.ConfirmedAt, "02/01/2006") }</div>
+						} else {
+							<div class="signature-pre-text"></div>
+							<div class="signature-pre-text"></div>
+						}
+						<div class="signature-line">Fecha (dd/mm/aa)</div>
+					</div>
+				</footer>
+			</div>
+		</body>
+	</html>
+}

@@ -27,6 +27,15 @@ func (h *DashboardHandler) ShowDashboard(c echo.Context) error {
 		User: user,
 	}
 
+	// Recent certificates
+	pgxUserID := pgtype.UUID{Bytes: user.ID, Valid: true}
+	certs, err := h.Repo.GetRecentCertificatesByTechnician(ctx, pgxUserID)
+	if err != nil {
+		log.Printf("Error getting recent certs for user %s: %v", user.ID, err)
+		// Non-critical error, can still render the page
+	}
+	props.RecentCerts = certs
+
 	if user.Role == repository.UserRoleADMIN {
 		stats, err := h.Repo.GetDashboardStats(ctx)
 		if err != nil {
@@ -34,14 +43,6 @@ func (h *DashboardHandler) ShowDashboard(c echo.Context) error {
 			// Non-critical error, can still render the page without stats
 		}
 		props.AdminStats = stats
-	} else { // TECNICO
-		pgxUserID := pgtype.UUID{Bytes: user.ID, Valid: true}
-		certs, err := h.Repo.GetRecentCertificatesByTechnician(ctx, pgxUserID)
-		if err != nil {
-			log.Printf("Error getting recent certs for user %s: %v", user.ID, err)
-			// Non-critical error, can still render the page
-		}
-		props.RecentCerts = certs
 	}
 
 	return render(c, http.StatusOK, view.DashboardPage(props))
