@@ -237,7 +237,7 @@ templ ViewCertificatePage(props ViewCertificatePageProps) {
 					<div class="signature-box">
 						if props.Cert.ConfirmationStatus == repository.CertificateStatusCONFIRMED {
 							<div class="signature-pre-text"></div>
-							<div class="signature-pre-text">{ FormatInLima(props.Cert.ConfirmedAt, "02/01/2006") }</div>
+							<div class="signature-pre-text">{ FormatInLima(props.Cert.ConfirmedAt, "02/01/2006 15:04") }</div>
 						} else {
 							<div class="signature-pre-text"></div>
 							<div class="signature-pre-text"></div>

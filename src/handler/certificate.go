@@ -320,3 +320,25 @@ func (h *CertificateHandler) HandleUpdateCertificate(c echo.Context) error {
 	c.Response().Header().Set("HX-Redirect", "/dashboard")
 	return c.NoContent(http.StatusOK)
 }
+
+func (h *CertificateHandler) ShowConfirmationActionPage(c echo.Context) error {
+	tokenStr := c.Param("token")
+	choice := c.QueryParam("choice")
+	token, err := uuid.Parse(tokenStr)
+	if err != nil {
+		return render(c, http.StatusBadRequest, view.ConfirmationResultPage("Error", "El enlace utilizado es inválido."))
+	}
+
+	pgxToken := pgtype.UUID{Bytes: token, Valid: true}
+	certDetails, err := h.Repo.GetCertificateDetailsByToken(c.Request().Context(), pgxToken)
+	if err != nil {
+		return render(c, http.StatusNotFound, view.ConfirmationResultPage("Error", "Certificado no encontrado."))
+	}
+
+	props := view.ConfirmationActionPageProps{
+		Cert:   certDetails,
+		Choice: choice,
+	}
+
+	return render(c, http.StatusOK, view.ConfirmationActionPage(props))
+}

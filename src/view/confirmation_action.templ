@@ -1,0 +1,52 @@
+package view
+
+import (
+	"alc/repository"
+	"fmt"
+)
+
+type ConfirmationActionPageProps struct {
+	Cert   repository.GetCertificateDetailsByTokenRow
+	Choice string
+}
+
+templ ConfirmationActionPage(props ConfirmationActionPageProps) {
+	@BasePage("Confirmar Asignación") {
+		<div class="flex items-center justify-center min-h-screen bg-gray-100">
+			<div class="p-8 bg-white rounded-lg shadow-lg text-center max-w-4xl">
+				<h1 class="text-2xl font-bold text-gray-800 mb-4">Revisar y Confirmar Asignación</h1>
+				<p class="text-gray-600 mb-6">Por favor, presione el botón correspondiente para finalizar la acción.</p>
+				if props.Cert.ConfirmationStatus == repository.CertificateStatusPENDING {
+					<form method="POST" class="mt-8">
+						<button
+							type="submit"
+							formaction={ fmt.Sprintf("/confirm/%s", props.Cert.ConfirmationToken.String()) }
+							class={
+								"px-8 py-3 text-white font-bold rounded-lg transition-colors shadow-md mr-4",
+								templ.KV("bg-green-600 hover:bg-green-700", props.Choice == "confirm"),
+								templ.KV("bg-gray-400 hover:bg-gray-500", props.Choice != "confirm"),
+							}
+						>
+							Confirmar Asignación
+						</button>
+						<button
+							type="submit"
+							formaction={ fmt.Sprintf("/reject/%s", props.Cert.ConfirmationToken.String()) }
+							class={
+								"px-8 py-3 text-white font-bold rounded-lg transition-colors shadow-md",
+								templ.KV("bg-red-600 hover:bg-red-700", props.Choice == "reject"),
+								templ.KV("bg-gray-400 hover:bg-gray-500", props.Choice != "reject"),
+							}
+						>
+							Observar Asignación
+						</button>
+					</form>
+				} else {
+					<div class="mt-8 p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+						<p class="font-bold text-yellow-800">Esta solicitud ya fue marcada como { string(props.Cert.ConfirmationStatus) }.</p>
+					</div>
+				}
+			</div>
+		</div>
+	}
+}

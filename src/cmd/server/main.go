@@ -103,8 +103,9 @@ func main() {
 	apiGroup.GET("/machine", apiHandler.GetMachine)
 
 	// Public Confirmation Routes
-	e.GET("/confirm/:token", certHandler.HandleCertificateConfirmation)
-	e.GET("/reject/:token", certHandler.HandleCertificateRejection)
+	e.GET("/certificate/action/:token", certHandler.ShowConfirmationActionPage)
+	e.POST("/confirm/:token", certHandler.HandleCertificateConfirmation)
+	e.POST("/reject/:token", certHandler.HandleCertificateRejection)
 	e.GET("/certificate/view/:token", certHandler.ShowCertificate)
 
 	// Add a root redirect for convenience

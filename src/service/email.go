@@ -52,6 +52,7 @@ const finalCertificateTpl = `
         <li><strong>Modelo:</strong> {{.NewDeviceModel}}</li>
         <li><strong>N/S:</strong> {{.NewDeviceSerial}}</li>
         <li><strong>Placa:</strong> {{.NewDevicePlate}}</li>
+        <li><strong>Firma digital:</strong> {{.DigitalSignature}}</li>
     </ul>
     <p>Puedes ver una copia del acta en cualquier momento haciendo clic en el siguiente enlace:</p>
     <p><a href="{{.ViewURL}}" style="padding: 10px 15px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Ver Acta de Conformidad</a></p>
@@ -95,8 +96,8 @@ func (s *EmailService) SendConfirmationEmail(ctx context.Context, user repositor
 	}{
 		UserName:        user.Name,
 		ViewURL:         fmt.Sprintf("%s/certificate/view/%s", s.config.AppBaseURL, cert.ConfirmationToken.String()),
-		ConfirmURL:      fmt.Sprintf("%s/confirm/%s", s.config.AppBaseURL, cert.ConfirmationToken.String()),
-		RejectURL:       fmt.Sprintf("%s/reject/%s", s.config.AppBaseURL, cert.ConfirmationToken.String()),
+		ConfirmURL:      fmt.Sprintf("%s/certificate/action/%s?choice=confirm", s.config.AppBaseURL, cert.ConfirmationToken.String()),
+		RejectURL:       fmt.Sprintf("%s/certificate/action/%s?choice=reject", s.config.AppBaseURL, cert.ConfirmationToken.String()),
 		NewDevicePlate:  machine.PlateNum,
 		NewDeviceSerial: machine.SerialNum,
 		NewDeviceModel:  machine.Model,
@@ -133,17 +134,19 @@ func (s *EmailService) SendFinalCertificateEmail(ctx context.Context, user repos
 	msg.Subject(fmt.Sprintf("Acta de conformidad registrada para equipo: %s", cert.NewDevicePlate))
 
 	data := struct {
-		UserName        string
-		ViewURL         string
-		NewDevicePlate  string
-		NewDeviceSerial string
-		NewDeviceModel  string
+		UserName         string
+		ViewURL          string
+		NewDevicePlate   string
+		NewDeviceSerial  string
+		NewDeviceModel   string
+		DigitalSignature string
 	}{
-		UserName:        user.Name,
-		ViewURL:         fmt.Sprintf("%s/certificate/view/%s", s.config.AppBaseURL, cert.ConfirmationToken.String()),
-		NewDevicePlate:  cert.NewDevicePlate,
-		NewDeviceSerial: cert.NewDeviceSerial,
-		NewDeviceModel:  cert.NewDeviceModel,
+		UserName:         user.Name,
+		ViewURL:          fmt.Sprintf("%s/certificate/view/%s", s.config.AppBaseURL, cert.ConfirmationToken.String()),
+		NewDevicePlate:   cert.NewDevicePlate,
+		NewDeviceSerial:  cert.NewDeviceSerial,
+		NewDeviceModel:   cert.NewDeviceModel,
+		DigitalSignature: cert.ConfirmationToken.String(),
 	}
 
 	t, err := template.New("final").Parse(finalCertificateTpl)
