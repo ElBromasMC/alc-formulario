@@ -79,12 +79,12 @@ templ NewDeviceDetails(machine repository.Machine) {
 		<input type="radio" id="new_status_backup" name="new_device_status" value="BACKUP"/><label for="new_status_backup">Backup</label>
 	</div>
 	<input id="new_device_disk" hx-swap-oob="true" type="text" name="new_device_disk" value={ machine.DiskSize }/>
-	<input id="new_device_code" hx-swap-oob="true" type="text" name="new_device_code" required/>
+	<input id="new_device_code" hx-swap-oob="true" type="text" name="new_device_code" value={ machine.PlateNum } required/>
 	<input id="new_device_model" hx-swap-oob="true" type="text" name="new_device_model" value={ machine.Model }/>
 	<div id="new_device_type_group" hx-swap-oob="true" class="form-group">
 		<label>Tipo:</label>
-		<input type="radio" id="new_type_pc" name="new_device_type" value="PC" checked={ machine.Type == repository.MachineTypePC }/><label for="new_type_pc">Pc</label>
-		<input type="radio" id="new_type_laptop" name="new_device_type" value="LAPTOP" checked={ machine.Type == repository.MachineTypeLAPTOP }/><label for="new_type_laptop">Laptop</label>
+		<input type="radio" id="new_type_pc" name="new_device_type" value="PC" checked?={ machine.Type == repository.MachineTypePC }/><label for="new_type_pc">Pc</label>
+		<input type="radio" id="new_type_laptop" name="new_device_type" value="LAPTOP" checked?={ machine.Type == repository.MachineTypeLAPTOP }/><label for="new_type_laptop">Laptop</label>
 	</div>
 	<input id="new_device_memory" hx-swap-oob="true" type="text" name="new_device_memory" value={ machine.MemorySize }/>
 	<div id="new-device-serial-feedback" class="hidden full-width" hx-swap-oob="true"></div>
