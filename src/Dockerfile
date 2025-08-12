@@ -31,7 +31,7 @@ RUN go mod download
 # Production
 #
 
-FROM base AS builder
+FROM base AS production
 
 # Copy source and build
 USER runner
@@ -39,20 +39,14 @@ WORKDIR /home/runner/src
 COPY --chown=runner:runner . .
 RUN make clean
 RUN make ./build/server
-
-FROM docker.io/alpine:latest AS production
-
-# Create and switch to non-root user
-RUN addgroup -g 1000 runner \
-    && adduser -G runner -u 1000 -D runner
-USER runner
+RUN make ./build/seeder
 
 # Create required folders and change to app directory
-RUN mkdir /home/runner/app
+RUN mkdir /home/runner/app \
+    && cp /home/runner/src/build/server \
+    /home/runner/src/build/seeder \
+    /home/runner/app/
 WORKDIR /home/runner/app
-
-# Deploy the application binary into a lean image
-COPY --from=builder --chown=runner:runner /home/runner/src/build/server ./
 
 # Expose required ports
 EXPOSE 8080
