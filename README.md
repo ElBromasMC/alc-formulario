@@ -28,6 +28,7 @@ SMTP_PORT=587
 SMTP_USER=your-username
 SMTP_PASS=your-password
 SMTP_SENDER="Alicorp Rollout <no-reply@yourdomain.com>"
+SMTP_BCC_RECIPIENTS=test@example.com,test2@example.com
 APP_BASE_URL=http://localhost:8080
 
 # Env for the database

@@ -10,6 +10,7 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
       - SMTP_SENDER=${SMTP_SENDER}
+      - SMTP_BCC_RECIPIENTS=${SMTP_BCC_RECIPIENTS}
       - APP_BASE_URL=${APP_BASE_URL}
   db:
     image: docker.io/postgres:16-alpine

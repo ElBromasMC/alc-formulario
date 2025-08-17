@@ -21,7 +21,7 @@ templ ViewCertificatePage(props ViewCertificatePageProps) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>Acta de Conformidad - { props.Cert.TicketName }</title>
+			<title>{ fmt.Sprintf("A%04d", props.Cert.CertificateID) } - { props.Cert.NewMachineSerial } - { props.Cert.NewDeviceCode } - { props.Cert.Name }</title>
 			<script src="/static/js/htmx.min.js" defer></script>
 			<link rel="icon" href="/static/img/favicon.webp"/>
 			<style>
